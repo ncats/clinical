@@ -1,0 +1,81 @@
+<?xml version="1.0"?>
+<project name="clinical" default="compile" basedir=".">
+  <property name="lib" value="lib"/>
+  <property name="build" value="build"/>
+  <property name="src" value="src"/>
+  <property name="dist" value="dist"/>
+  <property name="deploy" value="deploy"/>
+  <property name="jarfile" value="clinical.jar"/>
+
+  <path id="compile.classpath">
+    <fileset dir="${lib}">
+      <include name="**/*.jar"/>
+    </fileset>
+  </path>
+
+  <path id="lib.classpath">
+      <fileset dir="${lib}">
+          <include name="**/*.jar"/>
+      </fileset>
+      <pathelement location="${build}"/>
+  </path>
+
+  <target name="init">
+    <tstamp>
+        <format property="touch.time" pattern="MM/dd/yyyy 'at' HH:mm:ss z"/>
+    </tstamp>
+
+    <!-- Create the build directory structure used by compile -->
+    <mkdir dir="${build}"/>
+    <mkdir dir="${dist}"/>
+    <mkdir dir="${deploy}"/>
+  </target>
+
+  <target name="compile" depends="init">
+    <!-- Compile the java code from ${src} into ${build} -->
+
+    <javac srcdir="${src}" 
+           destdir="${build}"
+	   deprecation="on"
+           debug="on"
+           fork="yes"
+	   includeantruntime="false"
+           target="1.5"
+           source="1.5">
+      <classpath refid="compile.classpath"/>
+    </javac>
+  </target>
+
+  <target name="dist" depends="compile">
+    <copy todir="${build}">
+       <fileset dir="${src}" includes="tripod/clinical/resources/**"/>
+    </copy>
+    <jar jarfile="${dist}/${jarfile}" basedir="${build}">
+       <manifest>
+          <attribute name="Built-By" value="${user.name}"/>
+	  <attribute name="Main-Class" value="tripod.clinical.ClinicalCrawler"/>
+       </manifest>
+    </jar>
+  </target>
+
+  <target name="deploy" depends="dist">
+    <copy todir="${deploy}">
+      <fileset dir="." includes="${dist}/${jarfile}"/>
+    </copy>
+  </target>
+
+  <target name="clean">
+    <delete includeEmptyDirs="true" quiet="true">
+         <fileset dir="${build}" includes="**"/>
+    </delete>
+  </target>
+
+  <target name="test" depends="compile">
+     <echo message="=== Clinical test "/>
+     <java classname="tripod.clinical.ClinicalCrawler" maxmemory="256m"
+            classpathref="lib.classpath" fork="true">
+         <arg value="data/dictionary.tsv"/>
+	 <arg value="data/ct08012013.zip"/>
+     </java>
+  </target>
+</project>
