@@ -1,17 +1,22 @@
-This directory contains source code for ternary search tree
-(`TernarySearchTree.java`) and Smith-Waterman local alignment
-(`SmithWaterman.java`). To compile you'll need at least Java 1.5.
+This directory contains source code for parsing clinical trials from
+ClinicalTrials.gov. To build a self-contained `clinical.jar` file,
+you'll need at least Java 1.5 and `ant`.
+
 
 ```
-javac -cp . *.java
+ant dist
 ```
 
-Each file is self-executable; i.e., try executing the following
+This should create a self-executable jar file `clinical.jar` in the
+`dist` directory. To match against the latest clinical trials, simply
+type the following
 
 ```
-java -cp . TernarySearchTree
-java -cp . SmithWaterman "testosterone undecanoate" "TESTOSTERONE DECANOATE"
+java -jar dist/clinical.jar dictionary.txt
 ```
+
+where `dictionary.txt` is a dictionary to match against. See the file
+`data/dictionary.tsv` for inspiration.
 
 Feel free to contact me at `nguyenda@mail.nih.gov` should you have any
 problems.
