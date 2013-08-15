@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<project name="clinical" default="compile" basedir=".">
+<project name="clinical" default="dist" basedir=".">
   <property name="lib" value="lib"/>
   <property name="build" value="build"/>
   <property name="src" value="src"/>

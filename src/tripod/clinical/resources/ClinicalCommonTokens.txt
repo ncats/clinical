@@ -162,6 +162,8 @@ system
 1500
 2000
 500
+100
+20
 shell
 standard
 direct
@@ -185,3 +187,12 @@ after
 oxide
 heart
 lung
+change
+chinese
+stimulation
+interferon
+training
+flour
+active
+combination
+control

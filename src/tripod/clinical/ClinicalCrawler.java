@@ -52,6 +52,7 @@ public class ClinicalCrawler
     static final String DOWNLOAD_URL = "http://clinicaltrials.gov/ct2/results/download?down_typ=fields&down_fmt=xml&down_stds=all&down_flds=shown&flds=a,b,c,d,e,f,g,h,i,j,k,l,m,n,o,p,q,r,s,t";
     
     static class Study {
+        public String id;
 	public String title;
 	public List<String> conditions = new ArrayList<String>();
 	public List<String> interventions = new ArrayList<String>();
@@ -97,7 +98,7 @@ public class ClinicalCrawler
                 for (Study s; (s = workQ.take()) != DONE 
                          && !t.isInterrupted(); ) {
                     Set<AlignmentRef> matches = align (s);
-                    //output (s, matches);
+                    output (s, matches);
                 }
                 logger.info("## "+name+" finishes!");
             }
@@ -240,6 +241,10 @@ public class ClinicalCrawler
     protected ConcurrentMap<String, AlignmentResults> alignments = 
         new ConcurrentHashMap<String, AlignmentResults>();
 
+    protected PrintStream matchStream = System.out;
+    protected PrintStream alignStream = null;
+    protected int maxCandidates = 5;
+
     protected ExecutorService threadPool;
 
     public ClinicalCrawler () {
@@ -260,6 +265,19 @@ public class ClinicalCrawler
         return loadModifiers (ClinicalCrawler.class
                               .getResourceAsStream(MODIFIER_RESOURCE));
     }
+
+    public void setMatchStream (PrintStream matchStream) {
+        if (matchStream != null)
+            matchStream.println("CT_ID,MATCH_TERM,DICT_ID,DICT_TERM"
+                                +",SCORE,GLOBAL,LOCAL");
+        this.matchStream = matchStream;
+    }
+    public PrintStream getMatchStream () { return matchStream; }
+
+    public void setAlignStream (PrintStream alignStream) {
+        this.alignStream = alignStream;
+    }
+    public PrintStream getAlignStream () { return alignStream; }
 
     public int loadModifiers (InputStream is) throws IOException {
         BufferedReader br = new BufferedReader (new InputStreamReader (is));
@@ -381,70 +399,9 @@ public class ClinicalCrawler
         threadPool.shutdownNow();
     }
 
-    protected void align (PrintStream ps, String term) {
-        SmithWaterman aligner = new SmithWaterman ();
-        int count = 0;
-        for (Map.Entry<String, Set<String>> me : dictionary.entrySet()) {
-            String dict = null;
-            Alignment best = null;
-            List<Alignment> alns = new ArrayList<Alignment>();
-            for (String t : me.getValue()) 
-                if (aligner.align(term, t) > 0) {
-                    Alignment aln = aligner.getBestAlignment();
-                    if (best == null || aln.score() > best.score()) {
-                        alns.clear();
-                        for (Enumeration<Alignment> en = aligner.alignments(); 
-                             en.hasMoreElements();) {
-                            alns.add(en.nextElement());
-                        }
-                        best = aln;
-                        dict = t;
-                    }
-                }
-
-            if (best != null) {
-                int matches = 0;
-                for (Alignment aln : alns) {
-
-                    // check to see if the extent of this alignment is
-                    // a modifier
-                    Double mult = modifiers.get(aln.token1().toLowerCase());
-                    if (mult == null)
-                        mult = 1.;
-
-                    double score = mult* aln.local();
-                    if (aln.global() > .2 && score > 0.9) {
-                        if (matches++ == 0) {
-                            ps.println("## "+me.getKey()+": \""
-                                       +term+"\" vs \""+dict+"\"");
-                        }
-                        ps.println(String.format("## %1$2d: ", matches)
-                                   +" raw="+aln.score()
-                                   +" global="
-                                   +String.format("%1$.3f", aln.global())
-                                   +" local="
-                                   +String.format("%1$.3f", aln.local())
-                                   +" score="
-                                   +String.format("%1$.3f", aln.similarity()));
-                        
-                        ps.println(aln);
-                    }
-                }
-
-                if (matches > 0)
-                    ++count;
-            }
-        }
-
-        if (count == 0) {
-            ps.println("** Term \""+term+"\" is not found in the dictionary!");
-        }
-    }
-
     protected Set<AlignmentRef> align (Study s) {
         Set<AlignmentRef> all = new TreeSet<AlignmentRef>();
 
-        logger.info("+++ "+Thread.currentThread().getName()+" "+s.url);
         for (String term : s.interventions) {
             AlignmentResults results = alignments.get(term);
             if (results == null) {
@@ -471,18 +428,21 @@ public class ClinicalCrawler
         }
 
         if (!all.isEmpty()) {
+            /*
             for (AlignmentRef ar : all) {
                 System.err.println("---");
                 ar.print(System.err);
             }
             System.err.println(all.size()+" alignment(s)");
+            */
+            logger.info("+++ "+Thread.currentThread().getName()+" "+s.id+" => "
+                        +all.size()+" alignment(s)!");
         }
         else {
-            logger.warning("No alignments found for "+s.url+": "+s.title+"\n"
+            logger.warning("No alignments found for "+s.id+": "+s.title+"\n"
                            +s.toString(s.interventions));
         }
-        
-        logger.info("--- "+Thread.currentThread().getName()+" "+s.url);
+
         return all;
     }
 
@@ -527,7 +487,7 @@ public class ClinicalCrawler
 
                 // don't bother with anything else when we have exact match
                 if (results.hasExact()) {
-                    logger.info("## Exact match found for \""+term+"\"!");
+                    //logger.info("## Exact match found for \""+term+"\"!");
                     return results;
                 }
             }
@@ -536,18 +496,43 @@ public class ClinicalCrawler
         return results.size() > 0 ? results : null;
     }
 
-    synchronized void output (Study s, Map<String, Alignment> matches) {
-        System.out.println("### "+s.url);
+    synchronized void output (Study s, Set<AlignmentRef> matches) {
         if (matches == null || matches.isEmpty()) {
+            if (matchStream != null) {
+                for (String d : s.interventions) {
+                    matchStream.println(s.id+",\""+d+"\",,,,,,");
+                }
+            }
             return;
         }
+        
+        Set<String> unique = new HashSet<String>();
+        int size = Math.max(s.interventions.size(), maxCandidates);
 
-        for (Map.Entry<String, Alignment> me : matches.entrySet()) {
-            Alignment a = me.getValue();
-            System.out.println(me.getKey()+" ["
-                               +String.format("%1$.3f,", a.global())
-                               +String.format("%1$.3f,", a.local())
-                               +String.format("%1$.3f]", a.similarity()));
+        for (AlignmentRef ar : matches) {
+            if (alignStream != null) {
+                alignStream.println("++++ "+String.format("%1$12s",s.id)
+                                    +": \""+ar.term+"\"");
+                alignStream.println("---- "+String.format("%1$12s",ar.id)
+                                    +": \""+ar.ref+"\"");
+                alignStream.println(ar.result);
+                alignStream.println
+                    ("["+String.format("%1$.3f,", ar.result.global())
+                     +String.format("%1$.3f,", ar.result.local())
+                     +String.format("%1$.3f]", ar.result.similarity()));
+            }
+
+            if (matchStream != null) {
+                if (unique.add(ar.id) && unique.size() <= size) {
+                    matchStream.println
+                        (s.id+",\""+ar.term+"\","
+                         +ar.id+","
+                         +"\""+ar.ref+"\","
+                         +String.format("%1$.3f", ar.result.similarity())+","
+                         +String.format("%1$.3f", ar.result.global())+","
+                         +String.format("%1$.3f", ar.result.local()));
+                }
+            }
         }
     }
 
@@ -592,6 +577,9 @@ public class ClinicalCrawler
 	if (qName.equals("study") && !study.interventions.isEmpty()) {
 	    studies.add(study);
 	}
+        else if (qName.equals("nct_id")) {
+            study.id = value;
+        }
 	else if (qName.equals("title")) {
 	    study.title = value;
 	}
@@ -637,7 +625,8 @@ public class ClinicalCrawler
     }
 
     public static void main (String[] argv) throws Exception {
-	ClinicalCrawler crawler = new ClinicalCrawler ();
+	ClinicalCrawler crawler = new ClinicalCrawler (2);
+
         if (argv.length > 0) {
             logger.info("LoadDicting dictionary "+argv[0]+"...");
             crawler.loadDict(new FileInputStream (argv[0]));
@@ -652,9 +641,19 @@ public class ClinicalCrawler
         else {
             file = crawler.download();
         }
+
+        PrintStream match = new PrintStream 
+            (new FileOutputStream ("crawler_match.csv"));
+        crawler.setMatchStream(match);
+        PrintStream align = new PrintStream
+            (new FileOutputStream ("crawler_align.txt"));
+        crawler.setAlignStream(align);
         
         logger.info("Parsing "+file+"...");
         crawler.parseCT(file);
         crawler.shutdown();
+
+        match.close();
+        align.close();
     }
 }

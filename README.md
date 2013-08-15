@@ -16,7 +16,9 @@ java -jar dist/clinical.jar dictionary.txt
 ```
 
 where `dictionary.txt` is a dictionary to match against. See the file
-`data/dictionary.tsv` for inspiration.
+`data/dictionary.tsv` for inspiration. Notice for large dictionary,
+it's likely that the default memory might not be sufficient, in which
+case add an option `-Xmx512m` to the command line above.
 
 Feel free to contact me at `nguyenda@mail.nih.gov` should you have any
 problems.
