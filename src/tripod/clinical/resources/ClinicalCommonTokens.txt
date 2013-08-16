@@ -3,6 +3,16 @@
 # interventions; these values are applied to the local score.
 # Think of this list as (weighted) stopwords in that they can't
 # serve as the sole alignment
+0
+1
+2
+3
+4
+5
+6
+7
+8
+9
 a
 b
 c
@@ -29,8 +39,8 @@ w
 x
 y
 z
-acid
-beta
+er
+as
 of
 or
 to
@@ -38,6 +48,7 @@ in
 on
 up
 by
+tm
 mg
 the
 and
@@ -47,6 +58,11 @@ not
 gel
 oil
 hcl
+eye
+mass
+acid
+acids
+beta
 oral
 dose
 plus
@@ -196,3 +212,35 @@ flour
 active
 combination
 control
+factor
+cancer
+head
+cycles
+cycle
+large
+japanese
+medical
+substance
+muscle
+methyl
+field
+high
+low
+continuous
+minor
+major
+recombinant
+whole
+sch
+medium
+plan
+chart
+long
+alcohol
+meal
+night
+solution
+synthetic
+european
+food
+needle
