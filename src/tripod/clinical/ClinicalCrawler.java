@@ -462,9 +462,17 @@ public class ClinicalCrawler
                     
                     // check to see if the extent of this alignment is
                     // a modifier
-                    Double mult = modifiers.get(aln.token1().toLowerCase());
-                    if (mult == null)
-                        mult = 1.;
+                    String token = aln.token1().toLowerCase();
+                    Double mult = modifiers.get(token);
+                    if (mult == null) {
+                        try {
+                            Integer.parseInt(token);
+                            mult = 0.; // don't allow just a number
+                        }
+                        catch (NumberFormatException ex) {
+                            mult = 1.; // allow
+                        }
+                    }
                     
                     double score = mult* aln.local();
                     // a balance between global & local
