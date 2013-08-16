@@ -196,3 +196,7 @@ flour
 active
 combination
 control
+european
+liquid
+chain
+poly
